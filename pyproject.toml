@@ -8,7 +8,8 @@ authors = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "black>=26.5.1",
+    "black>=25.12.0",
+    "dbt-core>1.5.1",
     "hatch>=1.16.5",
     "pygls>=2.1.1",
     "pytest>=9.0.3",

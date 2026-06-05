@@ -3,6 +3,7 @@ from pathlib import Path
 from dbt_ls.column import Column
 import json
 
+
 @dataclass(frozen=True)
 class Model:
     name: str

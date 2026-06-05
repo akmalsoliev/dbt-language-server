@@ -1,15 +1,29 @@
 from pygls.lsp.server import LanguageServer
+import logging
 from lsprotocol import types
 from importlib.metadata import version
-from dbt_ls.pattern import ref_pattern, source_pattern, column_pattern
+from dbt_ls.pattern import completion_context
 from dbt_ls.model import discover_models, enrich_models_from_catalog
-from dbt_ls.source import discover_sources
+from dbt_ls.source import discover_sources, enrich_sources_from_catalog
 from pathlib import Path
 from dbt_ls.alias import parse_aliases
+import os
+
+# logging.basicConfig(filename='pygls.log', filemode='w', level=logging.DEBUG)
+logging.basicConfig(
+    filename=os.path.expanduser("~/.local/state/nvim/dbt_ls.log"),
+    filemode="a",
+    level=logging.DEBUG,
+    force=True,  # tear down pygls' root handler and use ours
+)
+
+logging.getLogger("pygls").setLevel(logging.WARNING)
+log = logging.getLogger("dbt_ls")
 
 __version__ = version("dbt-ls")
 
 server = LanguageServer("dbt-ls", __version__)
+
 
 def find_dbt_project_root(root: str) -> str | None:
     for p in Path(root).rglob("dbt_project.yml"):
@@ -27,19 +41,42 @@ def on_initialize(params: types.InitializeParams):
         dbt_root = find_dbt_project_root(params.root_path)
         catalog_path = Path(f"{dbt_root}/target/catalog.json")
         models = discover_models(params.root_path)
+        log.debug("Finished parsing documented models")
         sources = discover_sources(params.root_path)
+        log.debug("Finished parsing documented sources")
         models = enrich_models_from_catalog(models, catalog_path)
+        log.debug("Finished parsing column info for models from catalog")
+        sources = enrich_sources_from_catalog(sources, catalog_path)
+        log.debug("Finished parsing column info for sources from catalog")
 
 
 @server.feature(
     types.TEXT_DOCUMENT_COMPLETION,
-    types.CompletionOptions(trigger_characters=[".", '"']),
+    types.CompletionOptions(trigger_characters=["'", '"', "(", "."]),
 )
 def completions(params: types.CompletionParams):
     document = server.workspace.get_text_document(params.text_document.uri)
     current_line = document.lines[params.position.line].strip()
+    pos = params.position
+    line = document.lines[pos.line] if pos.line < len(document.lines) else ""
+    line_prefix = line[: pos.character]
 
-    if current_line.endswith('ref("")') or ref_pattern(current_line):
+    ctx = completion_context(line_prefix)
+    if ctx is None:
+        log.debug("no pattern matched for %r", current_line, " (early exit)")
+        return None
+
+    log.debug("completion @ %d:%d | line=%r", pos.line, pos.character, current_line)
+
+    kind, info = ctx
+
+    if kind == "ref":
+        log.info(
+            "REF path matched %r → serving %d models: %s",
+            current_line,
+            len(models),
+            [m.name for m in models[:15]],
+        )
         return [
             types.CompletionItem(
                 m.name,
@@ -48,35 +85,42 @@ def completions(params: types.CompletionParams):
             )
             for m in models
         ]
-    elif current_line.endswith('source("")') or source_pattern(current_line):
+    elif kind == "source_name":
+        [log.debug(c) for m in (*models, *sources) for c in m.columns]
+        log.info(
+            "SOURCE path matched %r → serving %d sources: %s",
+            current_line,
+            len(sources),
+            [s.name for s in sources[:15]],
+        )
         return [
             types.CompletionItem(
                 s.name,
                 kind=types.CompletionItemKind(10),
                 label_details=types.CompletionItemLabelDetails(s.database),
-                insert_text=f'{s.source_name}", "{s.name}', # Works only perfect with autocomplete, Fix later
+                insert_text=f'{s.source_name}", "{s.name}',  # Works only perfect with autocomplete, Fix later
                 insert_text_format=types.InsertTextFormat.PlainText,
             )
             for s in sources
         ]
-    elif column_pattern(str.strip(current_line)):
-        # server.window_show_message(types.ShowMessageParams(type=types.MessageType(3), message=f"models with columns: {[(m.name, len(m.columns)) for m in models]}"))
-        match = column_pattern(current_line)
-        alias = match.group(0).split(".")[0]
-        full_text = document.source
-        alias_map = parse_aliases(full_text)
+    elif kind == "column":
+        alias = info["alias"]
+        alias_map = parse_aliases(document.source)
         model_name = alias_map.get(alias)
+        log.info("COLUMN path: alias=%r → model=%r", alias, model_name)
+
         return [
             types.CompletionItem(
                 label=c.name,
                 kind=types.CompletionItemKind(5),
                 label_details=types.CompletionItemLabelDetails(c.data_type),
-                )
-            for m in models
+            )
+            for m in (*models, *sources)
             for c in m.columns
             if m.name == model_name
         ]
     else:
+        log.debug("no pattern matched for %r", current_line)
         return []
 
 
@@ -95,6 +139,7 @@ def main():
    ╚═══════════════════════════════════════╝
     """
     print(banner)
+    logging.info("DBT Language Server started")
     server.start_io()
 
 
