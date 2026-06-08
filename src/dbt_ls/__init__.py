@@ -1,5 +1,7 @@
 from pygls.lsp.server import LanguageServer
 import logging
+import os
+import sys
 from lsprotocol import types
 from importlib.metadata import version
 from dbt_ls.pattern import completion_context
@@ -7,14 +9,11 @@ from dbt_ls.model import discover_models, enrich_models_from_catalog
 from dbt_ls.source import discover_sources, enrich_sources_from_catalog
 from pathlib import Path
 from dbt_ls.alias import parse_aliases
-import os
 from dbt_ls.project import Project
 
-# logging.basicConfig(filename='pygls.log', filemode='w', level=logging.DEBUG)
 logging.basicConfig(
-    filename=os.path.expanduser("~/.local/state/nvim/dbt_ls.log"),
-    filemode="a",
-    level=logging.DEBUG,
+    stream=sys.stderr,
+    level=os.environ.get("DBT_LS_LOG_LEVEL", "INFO").upper(),
     force=True,  # tear down pygls' root handler and use ours
 )
 
