@@ -2,6 +2,8 @@ import re
 
 
 REF_RE = re.compile(r"""ref\(\s*(?P<q>['"])(?P<model>[^'"]*)$""")
+# Full ref('model') call, used to find the model the cursor is *inside of*.
+REF_FULL_RE = re.compile(r"""ref\(\s*['"](?P<model>[^'"]+)['"]""")
 SOURCE_RE = re.compile(
     r"""source\(\s*(?P<q1>['"])(?P<src>[^'"]*)"""
     r"""(?:(?P=q1)\s*,\s*(?P<q2>['"])(?P<tbl>[^'"]*))?$"""
@@ -21,4 +23,14 @@ def completion_context(line_prefix: str):
         return ("ref", {})
     if m := COLUMN_RE.search(line_prefix):
         return ("column", {"alias": m.group("alias")})
+    return None
+
+
+def ref_model_at(line: str, character: int) -> str | None:
+    """
+    Check if cursor is on a model
+    """
+    for m in REF_FULL_RE.finditer(line):
+        if m.start("model") <= character <= m.end("model"):
+            return m.group("model")
     return None

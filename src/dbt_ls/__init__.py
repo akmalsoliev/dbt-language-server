@@ -4,7 +4,7 @@ import os
 import sys
 from lsprotocol import types
 from importlib.metadata import version
-from dbt_ls.pattern import completion_context
+from dbt_ls.pattern import completion_context, ref_model_at
 from dbt_ls.model import discover_models, enrich_models_from_catalog
 from dbt_ls.source import discover_sources, enrich_sources_from_catalog
 from pathlib import Path
@@ -83,7 +83,9 @@ def completions(params: types.CompletionParams):
             types.CompletionItem(
                 m.name,
                 kind=types.CompletionItemKind(18),
-                label_details=types.CompletionItemLabelDetails(m.path),
+                label_details=types.CompletionItemLabelDetails(
+                    m.path.split(dbt_root)[-1]
+                ),
             )
             for m in models
         ]
@@ -127,6 +129,30 @@ def completions(params: types.CompletionParams):
     else:
         log.debug("no pattern matched for %r", current_line)
         return []
+
+
+@server.feature(types.TEXT_DOCUMENT_DEFINITION)
+def definition(params: types.DefinitionParams):
+    """Jump from a ref('model') to that model's .sql file."""
+    document = server.workspace.get_text_document(params.text_document.uri)
+    pos = params.position
+    line = document.lines[pos.line] if pos.line < len(document.lines) else ""
+
+    model_name = ref_model_at(line, pos.character)
+    if model_name is None:
+        return None
+
+    target = next((m for m in models if m.name == model_name and m.path), None)
+    if target is None:
+        log.info("DEFINITION: no model file found for %r", model_name)
+        return None
+
+    log.info("DEFINITION: %r → %s", model_name, target.path)
+    start = types.Position(line=0, character=0)
+    return types.Location(
+        uri=Path(target.path).as_uri(),
+        range=types.Range(start=start, end=start),
+    )
 
 
 def main():

@@ -7,7 +7,7 @@ import json
 @dataclass(frozen=True)
 class Model:
     name: str
-    path: str | None = None
+    path: str
     columns: tuple[Column, ...] = ()
 
 
