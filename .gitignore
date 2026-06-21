@@ -12,3 +12,4 @@ wheels/
 .act
 
 logs/
+.env

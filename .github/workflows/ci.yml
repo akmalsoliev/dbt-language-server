@@ -62,3 +62,20 @@ jobs:
         with:
           name: dist
           path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    env:
+      PYPI_API_KEY: ${{ secrets.PYPI_API_KEY }}
+    steps:
+      - uses: actions/download-artifact@4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: astral-sh/setup-uv@v6
+
+      - run: uv publish --token $PYPI_API_KEY

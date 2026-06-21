@@ -1,22 +1,32 @@
 [project]
 name = "dbt-ls"
-version = "0.1.4"
-description = "Add your description here"
+version = "0.1.5"
+description = "Databse aware DBT Language Server"
 readme = "README.md"
 authors = [
     { name = "HuhtaLauri", email = "huhta.lauri@gmail.com" }
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "black>=25.12.0",
-    "dbt-core>1.5.1",
-    "dbt-duckdb>=1.10.1",
-    "hatch>=1.16.5",
-    "ibis-framework[duckdb,mssql,mysql,postgres]>=12.0.0",
+    "ibis-framework>=12.0.0",
     "pygls>=2.1.1",
-    "pytest>=9.0.3",
     "pyyaml>=6.0.3",
 ]
+
+[dependency-groups]
+dev = [
+    "black>=25.12.0",
+    "pytest>=9.0.3",
+    "hatch>=1.16.5",
+    "twine>=6.2.0",
+]
+
+[project.optional-depencies]
+duckdb = ["ibis-framework[duckdb]>=12.0.0"]
+postgres = ["ibis-framework[postgres]>=12.0.0"]
+mysql = ["ibis-framework[mysql]>=12.0.0"]
+sqlserver = ["ibis-framework[mssql]>=12.0.0"]
+all = ["ibis-framework[duckdb,postgres,mysql,mssql]>=12.0.0"]
 
 [project.scripts]
 dbt-ls = "dbt_ls:main"
