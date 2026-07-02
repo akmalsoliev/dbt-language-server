@@ -1,4 +1,5 @@
 from pygls.lsp.server import LanguageServer
+from pygls.uris import to_fs_path
 import logging
 import os
 import sys
@@ -37,31 +38,30 @@ def find_dbt_project_root(root: str) -> str:
     return "."
 
 
-@server.feature(types.INITIALIZE)
-def on_initialize(params: types.InitializeParams):
+def load_project(ls: LanguageServer):
     global models
     global sources
     global dbt_root
     global project
 
-    if not params.root_path:
+    root_path = ls.workspace.root_path
+
+    if not root_path:
         log.warning("Initialize received no root_path; skipping project discovery")
         return
 
-    dbt_root = find_dbt_project_root(params.root_path)
+    dbt_root = find_dbt_project_root(root_path)
     if not dbt_root:
-        log.warning(
-            "No dbt project root found under %s; skipping discovery", params.root_path
-        )
+        log.warning("No dbt project root found under %s; skipping discovery", root_path)
         return
 
     project = Project(dbt_root)
 
     # Models and sources don't need the profile, so resolve them unconditionally.
-    models = discover_models(root=params.root_path, model_paths=project.model_paths)
+    models = discover_models(root=root_path, model_paths=project.model_paths)
     log.debug("Finished parsing documented models")
 
-    sources = discover_sources(params.root_path)
+    sources = discover_sources(root_path)
     log.debug("Finished parsing documented sources")
 
     # Catalog enrichment — only if the catalog has actually been generated.
@@ -101,6 +101,30 @@ def on_initialize(params: types.InitializeParams):
             sources = leftover_sources
             log.debug("Replaced sources with leftover sources")
         log.debug("Finished parsing column info for models from database")
+
+
+@server.feature(types.INITIALIZE)
+def on_initialize(ls: LanguageServer, params: types.InitializeParams):
+    load_project(ls)
+
+
+@server.command("dbt-ls.reload")
+def reload(ls: LanguageServer):
+    load_project(ls)
+    ls.window_show_message(
+        types.ShowMessageParams(types.MessageType(3), "dbt-ls: project reloaded")
+    )
+
+
+@server.command("dbt-ls.current_model")
+def current_model(model_uri):
+    path = to_fs_path(model_uri)
+    candidate_model = [model for model in models if path == model.path]
+    return (
+        {"dbt_root": dbt_root, "exec_path": candidate_model[0].exec_path}
+        if candidate_model
+        else None
+    )
 
 
 @server.feature(

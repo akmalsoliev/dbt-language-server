@@ -13,6 +13,7 @@ from typing import Callable, Any
 from ibis import BaseBackend
 
 from dbt_ls.source import SourceTable
+import os
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,13 @@ class Model:
     name: str
     path: str
     columns: tuple[Column, ...] = ()
+
+    def __repr__(self):
+        return f"Model: {self.name}, Path: {self.path}, Exec path: {self.exec_path}"
+
+    @property
+    def exec_path(self) -> str:
+        return self.path.split("models/")[-1].split(".sql")[0].replace(os.sep, ".")
 
 
 def discover_models(root: str, model_paths: list[str]) -> list[Model]:
