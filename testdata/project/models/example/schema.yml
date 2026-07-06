@@ -32,3 +32,4 @@ sources:
             data_type: int
           - name: msg
             data_type: varchar
+      - name: documented_source1

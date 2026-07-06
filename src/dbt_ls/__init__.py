@@ -9,6 +9,7 @@ from dbt_ls.pattern import completion_context, ref_model_at
 from dbt_ls.model import (
     discover_models,
     enrich_models_from_database,
+    filter_documented_database_sources,
 )
 from dbt_ls.source import discover_sources, enrich_sources_from_catalog
 from pathlib import Path
@@ -105,13 +106,16 @@ def load_project(ls: LanguageServer):
         if database_models:
             models = database_models
         if leftover_sources:
-            sources = leftover_sources
+            documented_sources, undocumented_sources = (
+                filter_documented_database_sources(sources, leftover_sources)
+            )
+            sources = documented_sources
             log.debug("Replaced sources with leftover sources")
         log.debug("Finished parsing column info for models from database")
 
 
 @server.feature(types.INITIALIZE)
-def on_initialize(ls: LanguageServer):
+def on_initialize(ls: LanguageServer, params: types.ParameterInformation):
     load_project(ls)
 
 

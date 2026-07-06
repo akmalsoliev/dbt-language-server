@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from dbt_ls.column import Column
 import json
@@ -171,10 +171,28 @@ def _get_database_schema(
             for m in models
         ],
         [
-            SourceTable(name=s, source_name=s, columns=columns_by_name.get(s, ()))
+            SourceTable(name=s, source_name="<unknown>", columns=columns_by_name.get(s, ()))
             for s in leftover_sources
         ],
     )
+
+
+def filter_documented_database_sources(
+    sources: list[SourceTable], database_sources: list[SourceTable]
+):
+
+    by_name = {t.name: t for t in database_sources}
+
+    # Merged documented meaning that it is listed as a source and enriched with column information from data source
+    merged_documented_source = [
+        replace(by_name.pop(a.name), source_name=a.source_name)
+        for a in sources
+        if a.name in by_name
+    ]
+
+    undocumented_sources = list(by_name.values())
+
+    return merged_documented_source, undocumented_sources
 
 
 def enrich_models_from_database(
