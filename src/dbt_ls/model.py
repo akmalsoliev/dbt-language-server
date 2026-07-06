@@ -23,7 +23,7 @@ class Model:
     path: Path
     columns: tuple[Column, ...] = ()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Model: {self.name}, Path: {self.path}"
 
     @staticmethod
@@ -76,7 +76,7 @@ def enrich_models_from_catalog(models: list[Model], catalog_path: Path) -> list[
 
 def get_duckdb_models(
     models: list[Model], profile_target: DuckDBTarget, project_root: str | Path
-) -> list[Model] | None:
+) -> tuple[list[Model], list[SourceTable]]:
     ibis.set_backend("duckdb")
 
     connection_path = (
@@ -91,7 +91,7 @@ def get_duckdb_models(
 
 def get_database_models(
     models: list[Model], profile_target: DatabaseTarget, project_root: str | Path
-) -> list[Model] | None:
+) -> tuple[list[Model], list[SourceTable]]:
 
     con = ibis.postgres.connect(
         user=profile_target.user,
@@ -107,7 +107,7 @@ def get_database_models(
 
 def get_mysql_models(
     models: list[Model], profile_target: MySQLTarget, project_root: str | Path
-) -> list[Model] | None:
+) -> tuple[list[Model], list[SourceTable]]:
 
     con = ibis.mysql.connect(
         user=profile_target.user,
@@ -122,7 +122,7 @@ def get_mysql_models(
 
 def get_mssql_models(
     models: list[Model], profile_target: MSSQLTarget, project_root: str | Path
-) -> list[Model] | None:
+) -> tuple[list[Model], list[SourceTable]]:
     con = ibis.mssql.connect(
         user=profile_target.user,
         password=profile_target.password.reveal(),
@@ -139,7 +139,7 @@ def get_mssql_models(
 
 _DATABASE_METHOD_REGISTRY: dict[
     str,
-    Callable[..., list[Model] | None],
+    Callable[..., tuple[list[Model], list[SourceTable]]],
 ] = {
     "duckdb": get_duckdb_models,
     "postgres": get_database_models,
@@ -183,8 +183,8 @@ def enrich_models_from_database(
         DuckDBTarget | DatabaseTarget | MSSQLTarget | MySQLTarget | ProfileTarget
     ),
     project_root: str | Path,
-) -> list[Model] | None:
+) -> tuple[list[Model], list[SourceTable]]:
     fn = _DATABASE_METHOD_REGISTRY.get(profile_target.type)
     if fn is None:
-        return None
+        return ([], [])
     return fn(models, profile_target, project_root)

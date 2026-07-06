@@ -111,7 +111,7 @@ def load_project(ls: LanguageServer):
 
 
 @server.feature(types.INITIALIZE)
-def on_initialize(ls: LanguageServer, params: types.InitializeParams):
+def on_initialize(ls: LanguageServer):
     load_project(ls)
 
 
@@ -171,7 +171,7 @@ def completions(params: types.CompletionParams):
                 m.name,
                 kind=types.CompletionItemKind(18),
                 label_details=types.CompletionItemLabelDetails(
-                    m.path.split(dbt_root)[-1]
+                    str(m.path).split(dbt_root)[-1]
                 ),
             )
             for m in models

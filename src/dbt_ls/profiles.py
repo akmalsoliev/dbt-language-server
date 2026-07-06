@@ -1,7 +1,14 @@
 from pathlib import Path
-from dataclasses import dataclass, fields, field
+from dataclasses import dataclass, fields
 import yaml
-from typing import Any
+from typing import Any, Union, get_args, get_origin, get_type_hints
+import os
+from jinja2.sandbox import SandboxedEnvironment
+from types import UnionType
+
+
+class EnvVarError(Exception):
+    """Env var is unset and has no defaults"""
 
 
 class Secret:
@@ -21,6 +28,58 @@ class Secret:
     def __format__(self, _spec: str) -> str:
         return self.__repr__()
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Secret):
+            return NotImplemented
+        return self._value == other._value
+
+    def __hash__(self) -> int:
+        return hash(self._value)
+
+
+def _env_var(name: str, default: str | None = None) -> str:
+    value = os.environ.get(name, default)
+    if value is None:
+        raise EnvVarError(f"env_var({name!r}) is not set and has no default")
+    return value
+
+
+def render_profile_value(env: SandboxedEnvironment, value: str):
+    if not isinstance(value, str) or ("{{" not in value and "{%" not in value):
+        return value
+    return env.from_string(value).render()
+
+
+_TRUE = {"true", "1", "yes", "on", "t", "y"}
+_FALSE = {"false", "0", "no", "off", "f", "n"}
+
+
+def _coerce(value, hint):
+    if value is None:
+        return None
+
+    if get_origin(hint) in (Union, UnionType):  # Optional[X] / X | None
+        inner = [a for a in get_args(hint) if a is not type(None)]
+        hint = inner[0] if len(inner) == 1 else object  # bail on ambiguous unions
+
+    if hint is bool:
+        if isinstance(value, bool):
+            return value
+        s = str(value).strip().lower()
+        if s in _TRUE:
+            return True
+        if s in _FALSE:
+            return False
+        raise ValueError(f"{value!r} is not a valid boolean")
+
+    if hint is int and not isinstance(value, bool):
+        return int(value)
+
+    if hint is float:
+        return float(value)
+
+    return value
+
 
 @dataclass(kw_only=True)
 class ProfileTarget:
@@ -29,11 +88,26 @@ class ProfileTarget:
 
     @classmethod
     def from_dict(cls, data: dict) -> "ProfileTarget":
+        _env = SandboxedEnvironment()
+        _env.globals["env_var"] = _env_var
         target_cls = _TARGET_REGISTRY.get(data.get("type", ""), cls)
+
+        hints = get_type_hints(target_cls)
         allowed = {f.name for f in fields(target_cls)}
-        kwargs = {k: v for k, v in data.items() if k in allowed}
+
+        kwargs = {}
+        for k, v in data.items():
+            if k not in allowed:
+                continue
+            rendered = render_profile_value(_env, v)
+            try:
+                kwargs[k] = _coerce(rendered, hints.get(k, str))
+            except (ValueError, TypeError) as exc:
+                raise ValueError(f"profile field {k!r}: {exc}") from exc
+
         if isinstance(kwargs.get("password"), str):
             kwargs["password"] = Secret(kwargs["password"])
+
         return target_cls(**kwargs)
 
 
