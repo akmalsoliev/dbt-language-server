@@ -213,7 +213,7 @@ def completions(ls: DbtLanguageServer, params: types.CompletionParams):
                 m.name,
                 kind=types.CompletionItemKind(18),
                 label_details=types.CompletionItemLabelDetails(
-                    str(m.path).split(dbt_root)[-1]
+                    description=str(m.path).split(dbt_root)[-1]
                 ),
             )
             for m in models
@@ -230,7 +230,9 @@ def completions(ls: DbtLanguageServer, params: types.CompletionParams):
             types.CompletionItem(
                 s.name,
                 kind=types.CompletionItemKind(10),
-                label_details=types.CompletionItemLabelDetails(s.source_name),
+                label_details=types.CompletionItemLabelDetails(
+                    description=s.source_name
+                ),
                 insert_text=f'{s.source_name}", "{s.name}',
                 insert_text_format=types.InsertTextFormat.PlainText,
             )
@@ -246,7 +248,9 @@ def completions(ls: DbtLanguageServer, params: types.CompletionParams):
             types.CompletionItem(
                 label=c.name,
                 kind=types.CompletionItemKind(5),
-                label_details=types.CompletionItemLabelDetails(c.data_type),
+                label_details=types.CompletionItemLabelDetails(
+                    description=c.data_type
+                ),
             )
             for m in (*models, *sources)
             for c in m.columns
