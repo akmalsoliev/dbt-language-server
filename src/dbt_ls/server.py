@@ -118,6 +118,7 @@ def load_project(ls: DbtLanguageServer):
             token, types.WorkDoneProgressEnd(message="❌Target empty")
         )
         return
+    log.info(f"Using profile: {profile_target}")
 
     try:
         database_models, leftover_sources = enrich_models_from_database(

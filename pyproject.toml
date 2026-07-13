@@ -31,7 +31,7 @@ mysql = ["ibis-framework[mysql]>=12.0.0"]
 sqlserver = ["ibis-framework[mssql]>=12.0.0"]
 pyspark = ["ibis-framework[pyspark]>=12.0.0"]
 databricks = ["databricks-sdk>=0.120.0"]
-athena = [
+aws = [
     "boto3>=1.43.46",
     "botocore[crt]>=1.43.46",
     ]

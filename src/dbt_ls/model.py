@@ -16,6 +16,7 @@ from dbt_ls.profiles import (
     SparkTarget,
     DatabricksTarget,
     AthenaTarget,
+    GlueTarget,
 )
 from typing import Callable
 from ibis import BaseBackend
@@ -250,6 +251,39 @@ def get_athena_models(
     )
 
 
+def get_glue_models(
+    models: list[Model], profile_target: GlueTarget, project_root: str | Path
+) -> tuple[list[Model], list[SourceTable]]:
+    import boto3
+
+    columns_by_name: dict[str, tuple[Column, ...]] = {}
+
+    client = boto3.client("glue")
+
+    tables = client.get_tables(DatabaseName=profile_target.schema)
+
+    for t in tables["TableList"]:
+        columns_by_name[t["Name"]] = tuple(
+            Column(name=c["Name"], data_type=c["Type"])
+            for c in (t["StorageDescriptor"]["Columns"] or [])
+        )
+
+    leftover_sources = columns_by_name.keys() - [m.name for m in models]
+
+    return (
+        [
+            Model(name=m.name, path=m.path, columns=columns_by_name.get(m.name, ()))
+            for m in models
+        ],
+        [
+            SourceTable(
+                name=s, source_name="<unknown>", columns=columns_by_name.get(s, ())
+            )
+            for s in leftover_sources
+        ],
+    )
+
+
 _DATABASE_METHOD_REGISTRY: dict[
     str,
     Callable[..., tuple[list[Model], list[SourceTable]]],
@@ -261,6 +295,7 @@ _DATABASE_METHOD_REGISTRY: dict[
     "spark": get_spark_models,
     "databricks": get_databricks_models,
     "athena": get_athena_models,
+    "glue": get_glue_models,
 }
 
 

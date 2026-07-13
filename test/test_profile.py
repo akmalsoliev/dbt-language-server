@@ -8,6 +8,8 @@ from dbt_ls.profiles import (
     MSSQLTarget,
     SparkTarget,
     DatabricksTarget,
+    AthenaTarget,
+    GlueTarget,
 )
 
 
@@ -139,6 +141,58 @@ from dbt_ls.profiles import (
                 threads=1,
             ),
         ),
+        pytest.param(
+            {
+                "type": "athena",
+                "s3_staging_dir": "s3://mybucket/staging/",
+                "s3_data_dir": "s3://mybucket/data/",
+                "region_name": "eu-west-1",
+                "schema": "dev",
+                "database": "awsdatacatalog",
+                "aws_profile_name": "myprofile",
+                "aws_access_key_id": "AKIA123",
+                "aws_secret_access_key": "secretkey123",
+                "threads": 4,
+            },
+            AthenaTarget(
+                type="athena",
+                s3_staging_dir="s3://mybucket/staging/",
+                s3_data_dir="s3://mybucket/data/",
+                region_name="eu-west-1",
+                schema="dev",
+                database="awsdatacatalog",
+                aws_profile_name="myprofile",
+                aws_access_key_id="AKIA123",
+                aws_secret_access_key=Secret("secretkey123"),
+                threads=4,
+            ),
+        ),
+        pytest.param(
+            {
+                "type": "glue",
+                "project_name": "myproject",
+                "role_arn": "arn:aws:iam::123456789012:role/GlueRole",
+                "region": "eu-west-1",
+                "workers": 2,
+                "worker_type": "G.1X",
+                "schema": "dev",
+                "session_provisioning_timeout_in_seconds": 120,
+                "location": "s3://mybucket/warehouse/",
+                "threads": 1,
+            },
+            GlueTarget(
+                type="glue",
+                project_name="myproject",
+                role_arn="arn:aws:iam::123456789012:role/GlueRole",
+                region="eu-west-1",
+                workers=2,
+                worker_type="G.1X",
+                schema="dev",
+                session_provisioning_timeout_in_seconds=120,
+                location="s3://mybucket/warehouse/",
+                threads=1,
+            ),
+        ),
     ],
     ids=[
         "duckdb",
@@ -148,6 +202,8 @@ from dbt_ls.profiles import (
         "spark",
         "databrickstoken",
         "databricksoauth",
+        "athena",
+        "glue",
     ],
 )
 def test_target_from_dict(target_dict, expected):

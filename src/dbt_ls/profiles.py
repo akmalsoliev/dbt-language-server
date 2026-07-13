@@ -105,7 +105,7 @@ class ProfileTarget:
             except (ValueError, TypeError) as exc:
                 raise ValueError(f"profile field {k!r}: {exc}") from exc
 
-        SECRET_FIELDS = {"password", "token", "client_secret"}
+        SECRET_FIELDS = {"password", "token", "client_secret", "aws_secret_access_key"}
         for name in SECRET_FIELDS:
             if isinstance(kwargs.get(name), str):
                 kwargs[name] = Secret(kwargs[name])
@@ -188,6 +188,18 @@ class AthenaTarget(ProfileTarget):
     aws_secret_access_key: Secret | None = None
 
 
+@dataclass(kw_only=True)
+class GlueTarget(ProfileTarget):
+    project_name: str
+    role_arn: str
+    region: str
+    workers: int
+    worker_type: str
+    schema: str
+    session_provisioning_timeout_in_seconds: int
+    location: str
+
+
 _TARGET_REGISTRY: dict[str, type[ProfileTarget]] = {
     "duckdb": DuckDBTarget,
     "postgres": DatabaseTarget,
@@ -196,6 +208,7 @@ _TARGET_REGISTRY: dict[str, type[ProfileTarget]] = {
     "spark": SparkTarget,
     "databricks": DatabricksTarget,
     "athena": AthenaTarget,
+    "glue": GlueTarget,
 }
 
 
